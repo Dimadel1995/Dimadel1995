@@ -1,0 +1,103 @@
+data<-rep(1992:2020,each=2)
+detenuti<-rep(c("totali","stranieri"),length(data)/2)
+dati<-c(47316,7237,50348,7892,51165,8481,46908,8334,47709,9373,48495,10825,
+        47811,11973,51814,14057,53165,15582,55275,16294,55670,16788,54237,17007,
+        56068,17819,59523,19836,39005,13152,48693,18252,58127,21562,64791,24067,
+        67961,24954,66897,24174,65701,23492,62536,21854,53623,17462,52164,17340,
+        54653,18621,57608,19745,59655,20255,60769,19888,53364,17344)
+datas<-data.frame(data,detenuti,dati)
+
+library(tidyverse)
+
+ggplot(datas)+
+  geom_line(aes(x=data,y=dati,col=detenuti),size=1.5)+
+  theme_minimal()+
+  ylab("")+
+  xlab("")+
+  scale_y_continuous(breaks = seq(10000, 65000,5000))+
+  scale_x_continuous(breaks = seq(1992, 2020,2))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1,face = "bold"))+
+  theme(axis.text.y = element_text(face = "bold"))
+
+
+##############################
+
+# eta
+
+anni <- c("2005","2005-2020","2020")
+eta<-c(">69","60 - 69","50 - 59","45 - 59","40 - 44","35 - 39","30 - 34","25 - 29","21 - 24","18 - 20")
+eta<-rep(eta,each=3)
+eta<-as.factor(eta)
+eta<-ordered(eta, levels = c("18 - 20","21 - 24","25 - 29","30 - 34","35 - 39","40 - 44","45 - 59","50 - 59","60 - 69",">69"))
+anni<-rep(anni,length(eta)/3)
+anni<-as.factor(anni)
+anni<-ordered(anni,levels=c("2020","2005-2020","2005"))
+freq<-c(0.01,0.01,0.02,0.03,0.05,0.07,0.10,0.13,0.17,0.10,0.11,0.13,0.13,0.14,0.14,0.18,0.16,0.14,
+        0.19,0.16,0.14,0.16,0.14,0.12,0.08,0.07,0.06,0.02,0.02,0.01)
+datas<-data.frame(eta,anni,freq)
+
+
+ggplot(datas,aes(x=anni,y=freq,fill=anni))+
+  facet_wrap(vars(eta) , ncol=1, scales = "free_y",strip.position = "left")+
+  scale_y_continuous(labels=scales::percent,breaks = seq(0,.2,0.02))+
+  scale_fill_manual(values=c("red2","green2","blue"))+
+  ylab("")+
+  xlab("")+
+  geom_bar(stat="identity",width = .7)+ 
+  guides(fill="none")+
+  coord_flip()+
+  theme_minimal() 
+
+
+# durata pena
+
+anni <- c("2005","2005-2020","2020")
+pena<-c("ergastolo","> 20","10 - 20","5 - 10","3 - 5","2 - 3","1 - 2","fino a 1")
+pena<-rep(pena,each=3)
+pena<-as.factor(pena)
+pena<-ordered(pena, levels = c("ergastolo","> 20","10 - 20","5 - 10","3 - 5","2 - 3","1 - 2","fino a 1"))
+anni<-rep(anni,length(pena)/3)
+anni<-as.factor(anni)
+anni<-ordered(anni,levels=c("2020","2005-2020","2005"))
+freq<-c(0.03,0.05,0.05,0.06,0.06,0.07,0.14,0.15,0.18,0.23,0.26,0.28,0.23,0.22,0.22,0.11,0.11,0.11,
+        0.10,0.09,0.06,0.09,0.06,0.02)
+datas<-data.frame(pena,anni,freq)
+
+
+ggplot(datas,aes(x=anni,y=freq,fill=anni))+
+  facet_wrap(vars(pena) , ncol=1, scales = "free_y",strip.position = "left")+
+  scale_y_continuous(labels=scales::percent,breaks = seq(0,.3,0.02))+
+  scale_fill_manual(values=c("red2","green2","blue"))+
+  ylab("")+
+  xlab("")+
+  geom_bar(stat="identity",width = .7)+ 
+  guides(fill="none")+
+  coord_flip()+
+  theme_minimal() 
+
+
+# Titolo di studio
+
+anni <- c("2005","2005-2020","2020")
+titolo<-c("analfabeta","elementare","media","superiore","Laurea")
+titolo<-rep(titolo,each=3)
+titolo<-as.factor(titolo)
+titolo<-ordered(titolo, levels = c("analfabeta","elementare","media","superiore","Laurea"))
+anni<-rep(anni,length(titolo)/3)
+anni<-as.factor(anni)
+anni<-ordered(anni,levels=c("2020","2005-2020","2005"))
+freq<-c(0.08,0.07,0.06,0.31,0.23,0.18,0.51,0.57,0.58,0.09,0.12,0.16,0.01,0.02,0.02)
+datas<-data.frame(titolo,anni,freq)
+
+
+ggplot(datas,aes(x=anni,y=freq,fill=anni))+
+  facet_wrap(vars(titolo) , ncol=1, scales = "free_y",strip.position = "left")+
+  scale_y_continuous(labels=scales::percent,breaks = seq(0,.6,0.04))+
+  scale_fill_manual(values=c("red2","green2","blue"))+
+  ylab("")+
+  xlab("")+
+  geom_bar(stat="identity",width = .7)+ 
+  guides(fill="none")+
+  coord_flip()+
+  theme_minimal() 
+
