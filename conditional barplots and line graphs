@@ -1,3 +1,6 @@
+install.packages("tidyverse")
+library(tidyverse)
+
 data<-rep(1992:2020,each=2)
 detenuti<-rep(c("totali","stranieri"),length(data)/2)
 dati<-c(47316,7237,50348,7892,51165,8481,46908,8334,47709,9373,48495,10825,
@@ -7,7 +10,6 @@ dati<-c(47316,7237,50348,7892,51165,8481,46908,8334,47709,9373,48495,10825,
         54653,18621,57608,19745,59655,20255,60769,19888,53364,17344)
 datas<-data.frame(data,detenuti,dati)
 
-library(tidyverse)
 
 ggplot(datas)+
   geom_line(aes(x=data,y=dati,col=detenuti),size=1.5)+
