@@ -1,0 +1,110 @@
+install.packages(c("OpenStreetMap","rJava"))
+
+library(OpenStreetMap)
+library(ggplot2)
+library(ggspatial)
+
+maps<-function(lat,lon,i,r){
+  if(i>0 & i<7){
+    TIPO<-c("osm", "stamen-toner", "stamen-terrain","stamen-watercolor", "esri","esri-topo")[i]
+    
+    LAT1 = lat[1]
+    LAT2 = lat[2]
+    LON1 = lon[1]
+    LON2 = lon[2]
+    
+    map <- openmap(c(LAT2,LON1), c(LAT1,LON2), zoom = NULL,
+                   type = TIPO,
+                   mergeTiles = TRUE)
+    map.latlon <- openproj(map, projection = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+    Scuole <-  data.frame(
+    LON  =c(13.354128384655942,13.342962297231066,13.332492539558615, 13.362953568395442),
+    LAT= c(38.1349689115016,38.127985760719994,38.116287179704,38.13957884137883),
+    ID=c("VEIII","Einstein","PiolaTorre","Cassarà"))
+    Scuole$ID<-as.factor(Scuole$ID)
+    
+    mytheme <- theme(plot.title = element_text(face = "bold",size = rel(1.2), hjust = 0.5),
+                     panel.background = element_rect(colour = NA),
+                     plot.background = element_rect(colour = NA),
+                     axis.title = element_text(face = "bold",size = rel(1)),
+                     axis.title.y = element_text(angle=90,vjust =2),
+                     axis.title.x = element_text(vjust = -0.2))
+    
+    circle<-plotCircle(Scuole,3)
+    circle$X<-as.numeric(circle$X)
+    circle$Y<-as.numeric(circle$Y)
+    circle$Scuola<-as.factor(circle$Scuola)
+    cond<-seq(1,nrow(circle),1) %in% seq(1,nrow(circle),361)
+    
+    OSMap <- autoplot.OpenStreetMap(map.latlon)+
+      labs(title = "Go2Shool", subtitle = "",x = "Longitude", y="Latitude")+
+      geom_point(data=circle,aes(x=X,y=Y,col=Scuola),size=ifelse(cond,3,1))+
+      scale_colour_manual(values= rainbow(length(unique(circle$Scuola)))) +
+      annotation_scale(location = "bl") +
+      geom_label(data=Scuole, aes(x=LON ,y=LAT, label=ID, fontface=7), hjust=1, vjust=0, size=4) +
+      #geom_point(data=Scuole, aes(x=LON, y=LAT, fill=ID), size=4, shape=21) +
+      #scale_fill_manual(values= rainbow(nrow(Scuole))) +
+      mytheme
+    
+  } else{
+    print(paste(c("Error type map: use:","1(osm) ; 2(stamen-toner) ; 3(stamen-terrain)","4(stamen-watercolor) ; 5(esri) ; 6(esri-topo)"),sep="\n"))
+  }
+  return(OSMap)
+}
+
+plotCircle <- function(data, r) {
+  data<-Scuole
+  Scuole<-unique(data$ID)
+  n<-length(Scuole)
+  datas<-data.frame(X=c(),Y=c(),Scuola=c())
+  z0<-addcor(data[1,1] ,data[1,2],0.01,0)
+  z90<-addcor(data[1,1] ,data[1,2],0.01,90)
+  z180<-addcor(data[1,1] ,data[1,2],0.01,180)
+  z270<-addcor(data[1,1] ,data[1,2],0.01,270)
+  dist0<-distkm(as.numeric(z0),as.numeric(data[1,-3]))
+  dist90<-distkm(as.numeric(z90),as.numeric(data[1,-3]))
+  dist180<-distkm(as.numeric(z180),as.numeric(data[1,-3]))
+  dist270<-distkm(as.numeric(z270),as.numeric(data[1,-3]))
+  r0<-(0.01*r)/dist0
+  r90<-(0.01*r)/dist90
+  r180<-(0.01*r)/dist180
+  r270<-(0.01*r)/dist270
+  r1<-mean(c(r0,r90,r180,r270))
+  for(i in 1:n){
+    angles <- seq(0,2*pi,length.out=360)
+    x<-subset(data,ID==Scuole[i])[,1]
+    y<-subset(data,ID==Scuole[i])[,2]
+    z<-addcor(x ,y,r1,angles)
+    datas<-rbind(datas,cbind(X=c(x,as.numeric(z[,1])),Y=c(y,as.numeric(z[,2])),Scuola=as.character(rep(Scuole[i],361))))
+  }
+  return(datas)
+}
+
+addcor<-function(x,y,r,angles){
+  X<-r*cos(angles)+x
+  Y<-r*sin(angles)+y
+  return(data.frame(X,Y))
+}
+
+
+distkm<-function(A,B){
+  R=6372.795477598 # Km (raggio quadrico medio) errore dello 0.3%
+  lonA=(A[1]*pi)/180
+  lonB=(B[1]*pi)/180
+  latA=(A[2]*pi)/180
+  latB=(B[2]*pi)/180
+  return(R * acos(sin(latA) * sin(latB) + cos(latA) * cos(latB) * cos(lonA-lonB)))
+}
+
+#  maps(lat,lon,i,r)
+
+## lat scegliere l'intervallo della latitudine
+## lon scegliere l'intervallo della longitudine
+## i tipo di mappa da inserire 
+## r lunghezza in km del raggio dalle scuole
+
+lat<-c(38.07,38.18)
+lon<-c(13.29 ,13.41)
+
+maps(lat,lon,1,3)
+
