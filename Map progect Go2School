@@ -37,7 +37,7 @@ maps<-function(lat,lon,i,r){
     cond<-seq(1,nrow(circle),1) %in% seq(1,nrow(circle),361)
     
     OSMap <- autoplot.OpenStreetMap(map.latlon)+
-      labs(title = "Go2Shool", subtitle = "",x = "Longitude", y="Latitude")+
+      labs(title = "Go2School", subtitle = "",x = "Longitude", y="Latitude")+
       geom_point(data=circle,aes(x=X,y=Y,col=Scuola),size=ifelse(cond,3,1))+
       scale_colour_manual(values= rainbow(length(unique(circle$Scuola)))) +
       annotation_scale(location = "bl") +
