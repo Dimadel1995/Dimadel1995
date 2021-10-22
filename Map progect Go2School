@@ -4,7 +4,7 @@ library(OpenStreetMap)
 library(ggplot2)
 library(ggspatial)
 
-maps<-function(lat,lon,i,r){
+maps<-function(lat,lon,i,r,n){
   if(i>0 & i<7){
     TIPO<-c("osm", "stamen-toner", "stamen-terrain","stamen-watercolor", "esri","esri-topo")[i]
     
@@ -30,11 +30,13 @@ maps<-function(lat,lon,i,r){
                      axis.title.y = element_text(angle=90,vjust =2),
                      axis.title.x = element_text(vjust = -0.2))
     
-    circle<-plotCircle(Scuole,3)
+    circle<-plotCircle(Scuole,r,n)
+    dim(circle)
+    colnames(circle)[1:2]<-c("X","Y")
     circle$X<-as.numeric(circle$X)
     circle$Y<-as.numeric(circle$Y)
     circle$Scuola<-as.factor(circle$Scuola)
-    cond<-seq(1,nrow(circle),1) %in% seq(1,nrow(circle),361)
+    cond<-seq(1,nrow(circle),1) %in% c(1:4)
     
     OSMap <- autoplot.OpenStreetMap(map.latlon)+
       labs(title = "Go2School", subtitle = "",x = "Longitude", y="Latitude")+
@@ -49,18 +51,18 @@ maps<-function(lat,lon,i,r){
   } else{
     print(paste(c("Error type map: use:","1(osm) ; 2(stamen-toner) ; 3(stamen-terrain)","4(stamen-watercolor) ; 5(esri) ; 6(esri-topo)"),sep="\n"))
   }
-  return(OSMap)
+  return(list(Map=OSMap,dati=circle))
 }
 
-plotCircle <- function(data, r) {
-  data<-Scuole
+plotCircle <- function(data, r,n) {
   Scuole<-unique(data$ID)
-  n<-length(Scuole)
+  n1<-length(Scuole)
   datas<-data.frame(X=c(),Y=c(),Scuola=c())
-  z0<-addcor(data[1,1] ,data[1,2],0.01,0)
-  z90<-addcor(data[1,1] ,data[1,2],0.01,90)
-  z180<-addcor(data[1,1] ,data[1,2],0.01,180)
-  z270<-addcor(data[1,1] ,data[1,2],0.01,270)
+  angles <- seq(0,2*pi,length.out=n)
+  z0<-addcor(data[1,1] ,data[1,2],0.01,angles[n])
+  z90<-addcor(data[1,1] ,data[1,2],0.01,angles[round(n/4,0)])
+  z180<-addcor(data[1,1] ,data[1,2],0.01,angles[round(n/2,0)])
+  z270<-addcor(data[1,1] ,data[1,2],0.01,angles[round(n/2+n/4,0)])
   dist0<-distkm(as.numeric(z0),as.numeric(data[1,-3]))
   dist90<-distkm(as.numeric(z90),as.numeric(data[1,-3]))
   dist180<-distkm(as.numeric(z180),as.numeric(data[1,-3]))
@@ -70,12 +72,18 @@ plotCircle <- function(data, r) {
   r180<-(0.01*r)/dist180
   r270<-(0.01*r)/dist270
   r1<-mean(c(r0,r90,r180,r270))
-  for(i in 1:n){
-    angles <- seq(0,2*pi,length.out=360)
+  datas<-data
+  for(i in 1:n1){
     x<-subset(data,ID==Scuole[i])[,1]
     y<-subset(data,ID==Scuole[i])[,2]
-    z<-addcor(x ,y,r1,angles)
-    datas<-rbind(datas,cbind(X=c(x,as.numeric(z[,1])),Y=c(y,as.numeric(z[,2])),Scuola=as.character(rep(Scuole[i],361))))
+    z<-data.frame(X=c(),Y=c())
+    colnames(datas)[3]<-"Scuola"
+    for(j in 1:length(angles)){
+      z<-rbind(z,addcor1(x ,y,r1,angles[j],r))
+    }
+    D<-as.data.frame(cbind(X=as.numeric(z[,1]),Y=as.numeric(z[,2]),Scuola=as.character(rep(Scuole[i],360))))
+    colnames(D)<-colnames(datas)
+    datas<-rbind(datas,D)
   }
   return(datas)
 }
@@ -83,6 +91,49 @@ plotCircle <- function(data, r) {
 addcor<-function(x,y,r,angles){
   X<-r*cos(angles)+x
   Y<-r*sin(angles)+y
+  return(data.frame(X,Y))
+}
+
+distM<-function(dati,r){
+  Scuola<-unique(dati$Scuola)
+  n<-length(Scuola)
+  D<-list()
+  DD<-matrix(0,2,4)
+  for(i in 1:n){
+    dat<-subset(dati,Scuola==Scuola[i])
+    dist<-c()
+    for(j in 2:nrow(dat)){
+      dist<-c(dist,distkm(as.numeric(dat[1,-3]),as.numeric(dat[j,-3])))
+    }
+    DD[,i]<-c(mean(dist),(mean(dist))/r)
+    D[[i]]<-dist
+  }
+  colnames(DD)<-Scuola
+  names(D)<-Scuola
+  H<-list(DD,D)
+  names(H)<-c("Sintesi","Valori")
+  return(H)
+}
+
+
+addcor1<-function(x,y,r1,angles,r){
+  
+  X<-r1*cos(angles)+x
+  Y<-r1*sin(angles)+y
+  diss<-(r-distkm(c(x,y),c(X,Y)))
+  p<-(diss/r)
+  r1<-r1+r1*p
+  
+  X<-r1*cos(angles)+x
+  Y<-r1*sin(angles)+y
+  
+  diss<-(r-distkm(c(x,y),c(X,Y)))
+  p<-(diss/r)
+  r1<-r1+r1*p
+  
+  X<-r1*cos(angles)+x
+  Y<-r1*sin(angles)+y
+  
   return(data.frame(X,Y))
 }
 
@@ -102,9 +153,15 @@ distkm<-function(A,B){
 ## lon scegliere l'intervallo della longitudine
 ## i tipo di mappa da inserire 
 ## r lunghezza in km del raggio dalle scuole
+## n numero di punti da stimare per la circonferenza
 
-lat<-c(38.07,38.18)
-lon<-c(13.29 ,13.41)
+lat<-c(38.1,38.16)
+lon<-c(13.31 ,13.395)
+r<-1.5
+i<-1
+n<-500 
 
-maps(lat,lon,1,3)
-
+Dati<-maps(lat,lon,i,r,n)
+Dati$Map
+D<-distM(Dati$dati,r)
+D$Sintesi
