@@ -51,6 +51,18 @@ ggplot(datas,aes(x=anni,y=freq,fill=anni))+
   theme_minimal() 
 
 
+ggplot(datas,aes(x=anni,y=freq,fill=anni))+
++     facet_grid(eta ,switch = "x")+
++     scale_y_continuous(labels=scales::percent,breaks = seq(0,.2,0.02))+
++     scale_fill_manual(values=c("red2","green2","blue"))+
++     ylab("")+
++     xlab("")+
++     geom_bar(stat="identity",width = .7)+ 
++     guides(fill="none")+
++     coord_flip()+
++     theme_minimal() + theme(strip.text.y = element_text(angle = 0))
+
+
 # durata pena
 
 anni <- c("2005","2005-2020","2020")
@@ -102,4 +114,6 @@ ggplot(datas,aes(x=anni,y=freq,fill=anni))+
   guides(fill="none")+
   coord_flip()+
   theme_minimal() 
+
+
 
