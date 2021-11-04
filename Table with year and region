@@ -1,0 +1,167 @@
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+
+
+g_legend<-function(a.gplot){
+  tmp <- ggplot_gtable(ggplot_build(a.gplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)}
+
+
+ready<-function(period){
+  
+  D<-data.frame(matrix(0,1,3))
+  D<-D[-1,]
+  colnames(D)<-c("REGMf","SALUT","ANNO")
+  for (i in 1:length(period)){
+    
+    if(period[i]==2013){
+      d<-read_delim(paste("AVQ_Microdati_",as.character(period[i]),".txt",sep=""),delim="\t")
+      d<-d[,c("reg","salut")]
+      d<-d %>% mutate(ANNO=period[i])
+      colnames(d)<-c("REGMf","SALUT","ANNO")
+      D<-rbind(D,d)
+    }else{
+      if(period[i] %in% c(2014:2015)){
+        d<-read_delim(paste("AVQ_Microdati_",as.character(period[i]),".txt",sep=""),delim="\t")
+        d<-d[,c("REGMif","SALUT")]
+        d<-d %>% mutate(ANNO=period[i])
+        colnames(d)<-c("REGMf","SALUT","ANNO")
+        D<-rbind(D,d)
+      }else{
+        if(period[i] %in% c(2016,2017)){
+          d<-read_delim(paste("AVQ_Microdati_",as.character(period[i]),".txt",sep=""),delim="\t")
+          d<-d[,c("REGMiF","SALUT")]
+          d<-d %>% mutate(ANNO=period[i])
+          colnames(d)<-c("REGMf","SALUT","ANNO")
+          D<-rbind(D,d)
+        }
+        else{
+        if(period[i] == 2018){
+          d<-read_delim(paste("AVQ_Microdati_",as.character(period[i]),".txt",sep=""),delim="\t")
+          d<-d[,c("REGMF","SALUT")]
+          d<-d %>% mutate(ANNO=period[i])
+          colnames(d)<-c("REGMf","SALUT","ANNO")
+          D<-rbind(D,d)
+        }else{
+          if(period[i] == 2019){
+            d<-read_delim(paste("AVQ_Microdati_",as.character(period[i]),".txt",sep=""),delim="\t")
+            d<-d[,c("REGMf","SALUT")]
+            d<-d %>% mutate(ANNO=period[i])
+            D<-rbind(D,d)
+          }else{D<-"Error: data non esistente"}
+        }
+      }
+    }
+    }
+  }
+  
+  D<- D %>% mutate(Regioni=ifelse(REGMf=="010","Piemonte",
+                           ifelse(REGMf=="020","Valle_d_Aosta",
+                           ifelse(REGMf=="030","Lombardia",
+                           ifelse(REGMf=="040","Trentino_Alto_Adige",
+                           ifelse(REGMf=="050","Veneto",
+                           ifelse(REGMf=="060","Friuli_Venezia_Giulia",
+                           ifelse(REGMf=="070","Liguria",
+                           ifelse(REGMf=="080","Emilia_Romagna",
+                           ifelse(REGMf=="090","Toscana",
+                           ifelse(REGMf=="100","Umbria",
+                           ifelse(REGMf=="110","Marche",
+                           ifelse(REGMf=="120","Lazio",
+                           ifelse(REGMf=="130","Abruzzo",
+                           ifelse(REGMf=="140","Molise",
+                           ifelse(REGMf=="150","Campania",
+                           ifelse(REGMf=="160","Puglia",
+                           ifelse(REGMf=="170","Basilicata",
+                           ifelse(REGMf=="180","Calabria",
+                           ifelse(REGMf=="190","Sicilia",
+                           ifelse(REGMf=="200","Sardegna",
+                           ifelse(REGMf=="444","Nord_ovest",
+                           ifelse(REGMf=="555","Nord_est",
+                           ifelse(REGMf=="666","Centro",
+                           ifelse(REGMf=="777","Sud",
+                           ifelse(REGMf=="888","Isole",
+                           ifelse(REGMf=="999","Non_disponibile",
+                           ifelse(REGMf=="041","Bolzano",
+                           ifelse(REGMf=="042","Trento","ALTRO"
+                           )))))))))))))))))))))))))))))
+  
+  return(D)
+}
+
+
+plotty<-function(dati){
+  
+  TAB<-dati %>% group_by(ANNO,Regioni,SALUT) %>% summarise(freq=n()) %>%
+    group_by(ANNO,Regioni) %>% mutate(prop = prop.table(freq))  
+  
+  TAB[is.na(TAB$SALUT),]$SALUT<-0
+  TAB$SALUT<-as.factor(TAB$SALUT)
+  levels(TAB$SALUT)[1]<-"NA"
+  TAB$Regioni<-as.factor(TAB$Regioni)
+  TAB$ANNO<-as.factor(TAB$ANNO)
+  
+  
+  TAB1<-TAB[TAB$Regioni %in% levels(TAB$Regioni)[!levels(TAB$Regioni) %in% c("Nord_ovest","Nord_est","Centro","Sud","Isole","Non_disponibile","Bolzano","Trento")],]
+  levels(TAB1$SALUT)<-list(NF="NA",molto	= "1", abbastanza	="2",	poco ="3"	,per_niente="4")
+  TAB1$Regioni<-droplevels(TAB1$Regioni)
+  
+  A<-list(levels(TAB1$Regioni)[1:5],
+          levels(TAB1$Regioni)[6:10],
+          levels(TAB1$Regioni)[11:15],
+          levels(TAB1$Regioni)[16:20])
+  
+  D<-list()
+  
+  for(i in 1:length(A)){
+    
+    TAB2<-TAB1[TAB1$Regioni %in% A[[i]],]
+    
+    D[[i]]<-ggplot(TAB2,aes(x=ANNO,y=prop,fill=SALUT))+
+      geom_bar(stat="identity",colour="black")+ coord_flip()+
+      facet_wrap(facets = ~Regioni,strip.position = "right", ncol=1,dir="h")+
+      labs(x="Anni",y = NULL) +
+      scale_fill_manual(values=c("yellow","orange","chartreuse1","green3","blue1"),na.value="white",guide=guide_legend(reverse=TRUE))+
+      theme(axis.text=element_text(face = "bold",size=8),
+            axis.title.x=element_text(size=20, face="bold"),
+            legend.key.size = unit(0.31,"cm"),
+            legend.text = element_text( size =9),
+            legend.position=c(0.5,-0.8),
+            legend.direction = "horizontal",
+            plot.margin = unit(c(0.5,2,0.5,2), "cm"),
+            strip.background = element_blank (),
+            strip.placement = "outside",
+            strip.text = element_text(size = 10, face = "bold"),
+            strip.text.y = element_text(angle = 360))+
+      theme(legend.position="bottom")
+    
+  }
+  
+  names(D)<-c("1","2","3","4")
+  elm<-list(TAB,D)
+  names(elm)<-c("Tabella","Grafici")
+  return(elm)
+}
+
+finalplotty<-function(data,i){
+  
+  mylegend<-g_legend(data[[1]])
+  if(i >0 & i<3){
+    grid.arrange(arrangeGrob(data[[1+(2*(i-1))]] + theme(legend.position="none"),
+                             data[[2+(2*(i-1))]] + theme(legend.position="none")+labs(x=NULL,y = NULL) ,
+                             nrow=1),
+                 mylegend, nrow=2,heights=c(10, 1), top = grid::textGrob("Regioni Italiane",x=0.5,hjust=0))
+  }else{print("ERROR: i sbagliato, solo 1 o 2")}
+}
+
+
+period<-2013:2019
+setwd("C:/Users/Gabri/Desktop")
+dataset<-ready(period)
+Ext<-plotty(dataset)
+Ext$Tabella
+finalplotty(Ext$Grafici,1) # Prime 10
+finalplotty(Ext$Grafici,2) # Ultime 10
