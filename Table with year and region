@@ -132,7 +132,7 @@ plotty<-function(dati,colori){
     
     D[[i]]<-ggplot(TAB2,aes(x=ANNO,y=prop,fill=SALUT))+
       geom_bar(stat="identity",colour="black")+ coord_flip()+
-      facet_wrap(facets = ~Regioni,strip.position = "right", ncol=1,dir="h")+
+      facet_wrap(facets = ~Regioni,scales = "free_y",strip.position = "right", ncol=1,dir="h")+
       labs(x="Anni",y = NULL) +
       scale_fill_manual(values=colori,na.value="white",guide=guide_legend(reverse=TRUE))+
       theme(axis.text=element_text(face = "bold",size=8),
@@ -179,8 +179,10 @@ finalplotty<-function(data,i,Dom){
 
 period<-2013:2019
 dataset<-ready(period)
-colori<-c("white","orange","yellow","chartreuse1","green3")
+colori<-c("royalblue","orange","yellow","chartreuse1","green3")
 Ext<-plotty(dataset,colori)
 Ext$Tabella
 finalplotty(Ext$Grafici,1,"Qual è il suo livello di soddisfazione") # Prime 10
 finalplotty(Ext$Grafici,2,"Qual è il suo livello di soddisfazione") # Ultime 10
+
+
