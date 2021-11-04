@@ -93,7 +93,7 @@ ready<-function(period){
 }
 
 
-plotty<-function(dati){
+plotty<-function(dati,colori){
   
   TAB<-dati %>% group_by(ANNO,Regioni,SALUT) %>% summarise(freq=n()) %>%
     group_by(ANNO,Regioni) %>% mutate(prop = prop.table(freq))  
@@ -106,7 +106,7 @@ plotty<-function(dati){
   
   
   TAB1<-TAB[TAB$Regioni %in% levels(TAB$Regioni)[!levels(TAB$Regioni) %in% c("Nord_ovest","Nord_est","Centro","Sud","Isole","Non_disponibile","Bolzano","Trento")],]
-  levels(TAB1$SALUT)<-list(NF="NA",molto	= "1", abbastanza	="2",	poco ="3"	,per_niente="4")
+  levels(TAB1$SALUT)<-list(`NA`="NA",Molto	= "1", Abbastanza	="2",	Poco ="3"	,`Per Niente`="4")
   TAB1$Regioni<-droplevels(TAB1$Regioni)
   
   levels(TAB1$Regioni)<-list(
@@ -134,7 +134,7 @@ plotty<-function(dati){
       geom_bar(stat="identity",colour="black")+ coord_flip()+
       facet_wrap(facets = ~Regioni,strip.position = "right", ncol=1,dir="h")+
       labs(x="Anni",y = NULL) +
-      scale_fill_manual(values=c("yellow","orange","chartreuse1","green3","blue1"),na.value="white",guide=guide_legend(reverse=TRUE))+
+      scale_fill_manual(values=colori,na.value="white",guide=guide_legend(reverse=TRUE))+
       theme(axis.text=element_text(face = "bold",size=8),
             axis.title.x=element_text(size=20, face="bold"),
             legend.key.size = unit(0.31,"cm"),
@@ -157,9 +157,17 @@ plotty<-function(dati){
   return(elm)
 }
 
-finalplotty<-function(data,i){
+finalplotty<-function(data,i,Dom){
   
-  mylegend<-g_legend(data[[1]])
+  mylegend<-g_legend(data[[1]]+guides(fill =
+                                        guide_legend(reverse=TRUE,title=Dom,title.position = "top",
+                                          title.theme = element_text(
+                                            size = 10,
+                                            face = "bold",
+                                            colour = "black",
+                                            angle = 0
+                                          ),label.theme =element_text(size = 8,face = "bold") 
+                                        )))
   if(i >0 & i<3){
     grid.arrange(arrangeGrob(data[[1+(2*(i-1))]] + theme(legend.position="none")+labs(x=NULL,y = NULL),
                              data[[2+(2*(i-1))]] + theme(legend.position="none")+labs(x=NULL,y = NULL) ,
@@ -171,9 +179,8 @@ finalplotty<-function(data,i){
 
 period<-2013:2019
 dataset<-ready(period)
-Ext<-plotty(dataset)
+colori<-c("white","orange","yellow","chartreuse1","green3")
+Ext<-plotty(dataset,colori)
 Ext$Tabella
-finalplotty(Ext$Grafici,1) # Prime 10
-finalplotty(Ext$Grafici,2) # Ultime 10
-
-
+finalplotty(Ext$Grafici,1,"Qual è il suo livello di soddisfazione") # Prime 10
+finalplotty(Ext$Grafici,2,"Qual è il suo livello di soddisfazione") # Ultime 10
