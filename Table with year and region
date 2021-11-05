@@ -103,7 +103,7 @@ plotty<-function(dati,colori){
   levels(TAB$SALUT)[1]<-"NA"
   TAB$Regioni<-as.factor(TAB$Regioni)
   TAB$ANNO<-as.factor(TAB$ANNO)
-  
+  TAB$ANNO<-ordered(TAB$ANNO,levels=c(2019,2018,2017,2016,2015,2014,2013))
   
   TAB1<-TAB[TAB$Regioni %in% levels(TAB$Regioni)[!levels(TAB$Regioni) %in% c("Nord_ovest","Nord_est","Centro","Sud","Isole","Non_disponibile","Bolzano","Trento")],]
   levels(TAB1$SALUT)<-list(`NA`="NA",Molto	= "1", Abbastanza	="2",	Poco ="3"	,`Per Niente`="4")
@@ -184,5 +184,4 @@ Ext<-plotty(dataset,colori)
 Ext$Tabella
 finalplotty(Ext$Grafici,1,"Qual è il suo livello di soddisfazione") # Prime 10
 finalplotty(Ext$Grafici,2,"Qual è il suo livello di soddisfazione") # Ultime 10
-
 
