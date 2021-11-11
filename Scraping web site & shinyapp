@@ -376,7 +376,7 @@ Cord_cent<-corder(dati$Dataset$Centro)
 Cord_Att<-corder(dati$Dataset$Attico)
 
 prova<-na.omit(Cord_Att)
-A<-"38.149696365467754 13.317492239559737"
+A<-"38.14027309330837 13.348773522467749"
 
 "1=Auto"
 "2=Trasporto Pubblico"
