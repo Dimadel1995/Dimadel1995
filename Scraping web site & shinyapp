@@ -1,0 +1,410 @@
+library(RSelenium)
+library(rvest) 
+library(tidyverse)
+library(stringi)
+library(shiny)
+
+isn.na <- function(x) ifelse(sum(!(is.na(x)))>0,x[!(is.na(x))],"NULL")
+
+serc <- function(x) which(x !="NULL") 
+
+extra<-function(x) ifelse(length(x)==2,x[1],as.numeric(x[1])*60+as.numeric(x[3]))  
+
+Dtrans<-function(x){
+  a<-seq(1,length(x),3)
+  b<-seq(2,length(x),3)
+  d<-seq(3,length(x),3)
+  n<-length(x)/3
+  a<-x[a] %>% strsplit(.," ") %>% map(extra) %>% as.numeric
+  b<-x[b] %>% strsplit(.," ") %>% map(extra) %>% gsub(",",".",.) %>% as.numeric
+  d<-x[d]
+  D<-data.frame(matrix(0,n,3))
+  colnames(D)<-c("Min","Km","Percorso")
+  D[,1]<-a
+  D[,2]<-b
+  D[,3]<-d
+  return(D)
+}  
+
+Dtranss<-function(x){
+  a<-seq(1,length(x),3)
+  b<-seq(2,length(x),3)
+  d<-seq(3,length(x),3)
+  n<-length(x)/3
+  a<-x[a] %>% strsplit(.," ") %>% map(extra) %>% as.numeric
+  b<-x[b] %>% gsub("-"," - ",.)
+  d<-x[d]
+  D<-data.frame(matrix(0,n,3))
+  colnames(D)<-c("Min","Partenza - Arrivo","Mezzi")
+  D[,1]<-a
+  D[,2]<-b
+  D[,3]<-d
+  return(D)
+} 
+
+codes<-function(li,sequences,k=1){
+  
+  links<-c()
+  for (i in sequences) {
+    print(i)
+    
+    if(k==1){
+      link<-paste(li,as.character(i),sep="")
+    }else{
+      link<-ifelse(i==1,"https://www.immobiliare.it/vendita-attici/palermo/?criterio=rilevanza&stato=6&tipoProprieta=1",
+                   "https://www.immobiliare.it/vendita-attici/palermo/?criterio=rilevanza&pag=2&stato=6&tipoProprieta=1")
+    }
+    
+    remDr$navigate(link) 
+    html <- remDr$getPageSource()[[1]]
+    signals <- read_html(html)
+    
+    code<-signals %>% 
+      html_nodes("ul.in-realEstateResults.nd-list") %>% 
+      .[[1]] %>% 
+      html_nodes(".nd-list__item.in-realEstateResults__item") %>% 
+      html_attr("id") %>% 
+      gsub("^.*?ad_","",.)
+    
+    links<-c(links,code)
+  }  
+  return(links)
+  
+}
+
+extractor<-function(codes){
+  
+  L<-list()
+  
+  for(mu in 1:length(codes)){
+  
+  link<-paste("https://www.immobiliare.it/annunci/",codes[mu],"/",sep="")
+  
+  nod<-read_html(link)
+
+  name<-nod %>% html_nodes(".im-features__title") %>% html_text()
+  types<-nod %>% html_nodes(".im-features__value") %>% html_text() %>%  stri_replace_all_fixed(., "\n", "") %>% str_trim(., "both") %>%
+    strsplit(., '  ') %>% lengths()
+  
+  types_ma<-nod %>% html_nodes(".im-features__value") %>% html_text() %>%  stri_replace_all_fixed(., "\n", "") %>% str_trim(., "both") %>%
+    strsplit(., '  ') %>% .[lengths(.)>1]
+  n<-types_ma %>% length()
+  for(i in 1:n){ types_ma[[i]]<-types_ma %>% .[[i]] %>% unique() %>% .[nchar(.)>0]}
+  types_mi<-nod %>% html_nodes(".im-features__value") %>% html_text() %>%  stri_replace_all_fixed(., "\n", "") %>% str_trim(., "both") %>%
+    strsplit(., '  ') %>% .[!lengths(.)>1]
+  n<-length(types)
+  M<-list()
+  k<-0
+  j<-0
+  for(i in 1:n){
+    if(i %in% which(types>1)){
+      k<-k+1
+      M[[i]]<-types_ma[[k]]
+    }else{
+      j<-j+1
+      M[[i]]<-types_mi[[j]]
+    }
+  }
+  names(M)<-name
+  L[[mu]]<-M
+  }
+  names(L)<-codes
+  return(L)
+}
+
+
+datas<-function(codes){
+  
+  D<-matrix(0,length(codes),8)
+  D<-data.frame(D)
+  colnames(D)<-c("Scheda Immobile","Prezzo","Locali","Bagni","Piano","Titolo Descrizione","Descrizione","via")
+  D<- D %>% mutate_if(is.numeric,as.character)
+  for (i in 1:length(codes)){
+    print(paste("Pagina",as.character(i),sep=" "))
+    link<-paste("https://www.immobiliare.it/annunci/",codes[i],"/",sep="")
+    
+    nod<-read_html(link)
+    nome_S<-nod %>% html_nodes(".im-titleBlock__title") %>% html_text()
+    prezzo<-nod %>% 
+      html_nodes(".im-mainFeatures__title") %>% 
+      html_text() %>% 
+      stri_replace_all_fixed(., "\n", "") %>%
+      str_trim(., "both") %>% 
+      strsplit(., ' ') %>% 
+      .[[1]] %>% 
+      .[2] %>%  stri_replace_all_fixed(.,".", "")
+    n_loc<-nod %>% 
+      html_nodes(".im-mainFeatures__price+ .nd-list__item .im-mainFeatures__value") %>% 
+      html_text() %>% 
+      stri_replace_all_fixed(.," ", "") %>% 
+      stri_replace_all_fixed(., "\n", "") %>%  strsplit(., '') %>% .[[1]] %>% .[1]
+    n_ba<-nod %>% 
+      html_nodes(".nd-list__item:nth-child(4) .im-mainFeatures__value") %>% 
+      html_text() %>% 
+      stri_replace_all_fixed(.," ", "") %>% 
+      stri_replace_all_fixed(., "\n", "") %>%  strsplit(., '') %>% .[[1]] %>% .[1]
+    piano<-  nod %>% 
+      html_nodes(".nd-list__item:nth-child(5) .im-mainFeatures__value") %>% 
+      html_text() %>% 
+      stri_replace_all_fixed(.," ", "") %>% 
+      stri_replace_all_fixed(., "\n", "")
+    D_tit<-nod %>% 
+      html_nodes(".im-description__title") %>% 
+      html_text()
+    Desc<-nod %>% 
+      html_nodes(".js-readAllText") %>% 
+      html_text() %>%
+      stri_replace_all_fixed(., "\n", "") %>%
+      str_trim(., "both")
+    p1<-nod %>% 
+      html_nodes(".im-mainFeatures__title") %>% 
+      html_text() %>% 
+      stri_replace_all_fixed(., "\n", "") %>%
+      str_trim(., "both")
+    via<-nod %>% 
+      html_nodes(".im-titleBlock__link .im-location~ .im-location+ .im-location") %>% html_text()
+    D[i,]<-c(nome_S,ifelse(is.na(as.numeric(prezzo)),p1,prezzo),n_loc,n_ba,ifelse(length(piano)>0,piano,"NA"),ifelse(length(D_tit)>0,D_tit,"NA"),Desc,ifelse(length(via)>0,via,"NA"))
+  }
+  
+  return(D)
+}
+
+corder<-function(data){
+  A<-Sys.time()
+  b<-data$via %>% unique
+  link<-"https://www.google.it/maps/@38.1184491,13.3625916,17z"
+  
+  remDr$navigate(link) 
+  Sys.sleep(5)
+  
+  
+  search=NULL
+  assign('search',remDr$findElement(using='css selector',value='input#searchboxinput.tactile-searchbox-input'))
+  
+  data=NULL
+  for(i in 1:length(b)){
+    if(i==1){
+      alpha<-Sys.time()
+      print(paste("Completamento",as.character(round((i/length(b))*100,2)),"%",'"Tempo Iniziale:"',as.character(alpha),sep=" "))
+      name<-b[i] 
+      search$clearElement()
+      search$sendKeysToElement(list(name,key='enter'))
+      Sys.sleep(4)
+      lonlat=remDr$getCurrentUrl()[[1]] %>% gsub("^.*?!3d","",.) %>% strsplit(., '!4d') %>% .[[1]] %>% as.numeric()
+      data=rbind(data,data.frame(name=name,lat=lonlat[1],lon=lonlat[2]))
+    }else{
+      beta<-Sys.time()
+      lambda<-beta-alpha
+      alpha<-Sys.time()
+      print(paste("Completamento",as.character(round((i/length(b))*100,2)),"%",'"Secondi:"',as.character(lambda),sep=" "))
+      name<-b[i] 
+      search$clearElement()
+      search$sendKeysToElement(list(name,key='enter'))
+      Sys.sleep(4)
+      lonlat=remDr$getCurrentUrl()[[1]] %>% gsub("^.*?!3d","",.) %>% strsplit(., '!4d') %>% .[[1]] %>% as.numeric()
+      data=rbind(data,data.frame(name=name,lat=lonlat[1],lon=lonlat[2]))
+    }
+  }
+  print(Sys.time()-A)
+  return(data)
+}
+
+distance<- function(A,data,tipo,point=1){
+  
+  Y<-c("Auto","Trasporto Pubblico","A Piedi","Bicicletta","Voli")
+  Y<- Y %in% tipo
+  
+  delta<-Sys.time()
+  b<-paste(data$lat,data$lon,sep=" ")
+  link<-c("https://www.google.it/maps/dir///@38.1496584,13.315325,17z/data=!4m2!4m1!3e0",
+          "https://www.google.it/maps/dir///@38.1496584,13.315325,17z/data=!4m2!4m1!3e3",
+          "https://www.google.it/maps/dir///@38.1496584,13.315325,17z/data=!4m2!4m1!3e2",
+          "https://www.google.it/maps/dir///@38.1496584,13.315325,17z/data=!4m2!4m1!3e1",
+          "https://www.google.it/maps/dir///@38.1496584,13.315325,17z/data=!4m2!4m1!3e4")[Y]
+  
+  remDr$navigate(link) 
+  Sys.sleep(4)
+  from=NULL
+  assign('from',remDr$findElement(using='css selector',value="#sb_ifc50 > input:nth-child(1)"))
+  
+  to=NULL
+  assign('to',remDr$findElement(using='css selector',value="#sb_ifc51 > input:nth-child(1)"))
+  
+  dataset=NULL
+  for (i in point:nrow(data)){
+    
+    print(paste("Step:",as.character(i),as.character(round(i/nrow(data)*100,2)),"%",sep=" "))
+    from$clearElement()
+    from$sendKeysToElement(list(A,key='enter'))
+    to$clearElement()
+    to$sendKeysToElement(list(b[i],key='enter'))
+    
+    elem=NULL
+    assign('elem',remDr$findElement(using='css selector',value="#pane > div > div.Yr7JMd-pane-content.cYB2Ge-oHo7ed > div > div > div.siAUzd-neVct"))
+    Sys.sleep(5)
+    if(tipo=="Trasporto Pubblico"){
+      cond<-elem$getElementText()[[1]] %>% strsplit(.,"\n") %>% .[[1]] %>% length%%3 
+      if(cond==1){
+        a<-elem$getElementText()[[1]] %>% gsub("Dettagli\n","",.) %>% gsub("DETTAGLI\n","",.) %>%
+          gsub("\nDettagli","",.) %>% gsub("\nDETTAGLI","",.) %>%
+          strsplit(.,"\n") %>% .[[1]] %>% Dtranss
+      }else{
+        con<-elem$getElementText()[[1]] %>% strsplit(.,"\n") %>% .[[1]] %>% .[1:length(.)] %in% c("Dettagli","DETTAGLI")
+        n<-which(con)
+        if(length(n)==1){
+          a<-elem$getElementText()[[1]] %>% strsplit(.,"\n") %>% .[[1]] %>% .[-seq(n,n-2,-1)] %>% Dtranss
+        }else{
+          a<-elem$getElementText()[[1]] %>% strsplit(.,"\n") %>% .[[1]]
+          s<-c()
+          for(j in 1:length(n)){
+            s<-c(s,seq(n[j],n[j]-2,-1))
+          }
+          a<- a %>% .[-s] %>% Dtranss
+        } 
+      }
+    }else{
+      a<-elem$getElementText()[[1]] %>% gsub("DETTAGLI\n","",.) %>% gsub("DETTAGLI","",.) %>% gsub("Percorso più veloce, nonostante il traffico abituale\n","",.) %>%
+        gsub("Il percorso prevede il pagamento di pedaggi.\n","",.) %>% gsub("\nTraffico intenso come al solito","",.) %>% gsub("\nTraffico moderato come al solito","",.) %>%
+        gsub("\nTraffico meno intenso del solito","",.) %>% gsub("\nPercorso più rapido in questo momento, in base alle condizioni del traffico","",.) %>%
+        gsub("\nTraffico molto più intenso del solito","",.) %>% gsub("\nPercorso migliore, nonostante il traffico abituale","",.) %>%
+        gsub("\nPercorso migliore, traffico meno intenso del solito","",.) %>%
+        gsub("\nTraffico più intenso del solito","",.) %>% gsub("\nPercorso più veloce, traffico meno intenso del solito","",.) %>% gsub("\nPercorso migliore, nonostante traffico più intenso del solito","",.) %>%
+        gsub("Percorso più veloce, traffico regolare\n","",.) %>% gsub("Percorso migliore\n","",.) %>% gsub("Percorso più veloce\n","",.) %>% strsplit(.,"\n") %>% .[[1]] %>% Dtrans
+    }
+    dataset<-rbind(dataset,cbind(ID=i,Cord=b[i],a))
+  }
+  print(Sys.time()-delta)
+  return(dataset)
+}
+
+
+
+pulis<-function(data1){
+  
+  num<-data1$`Scheda Immobile` %>% 
+    stri_replace_all_fixed(., ",", "")  %>% 
+    strsplit(., ' ') %>% lapply(.,as.numeric) %>% 
+    lapply(.,isn.na) %>% unlist
+  
+  num_r<-data1$via %>% stri_replace_all_fixed(., ",", "")  %>% 
+    strsplit(., ' ') %>% lapply(.,as.numeric) %>% 
+    lapply(.,isn.na) %>% unlist %>% serc 
+  
+  if(length(num_r)!=0){
+    for(i in 1:length(num_r)){
+      
+      n_rr<-data1$via[num_r[i]] %>% strsplit(., ' ') %>% lapply(.,as.numeric) %>% lapply(.,serc) %>% unlist
+      new<-data1$via[num_r[i]] %>% strsplit(., ' ') %>% unlist %>% .[-n_rr] %>% paste(.,collapse = " ")
+      data1$via[num_r[i]] <- new
+    }
+  }
+  data1$via<- data1$via %>% stri_replace_all_fixed(., ",", "")
+  data1[which(as.numeric(num)!="NA"),]$via <- paste(data1[which(as.numeric(num)!="NA"),]$via,","," ",num[which(as.numeric(num)!="NA")],sep="")
+  data1$via<- paste(data1$via," , ","PALERMO",sep="")
+  return(data1)
+}
+
+servcond<-function(from,to,types){
+  
+  tipo<-c("Auto","Trasporto Pubblico","A Piedi","Bicicletta","Voli")[types]
+  
+  datas<-list()
+  for(i in 1:length(tipo)){
+    print(paste("Calcolo delle distabze:",tipo[i],sep=" "))
+    datas[[i]]<-distance(from,to,tipo[i])
+  }
+  names(datas)<-tipo
+  return(datas)
+}
+
+server <- function(input, output, session) {
+  
+  output$selected_var <- renderTable({Distanze[input$dataset]
+  })
+  
+}
+
+
+ui <-   basicPage(
+  h1("R Shiny selectInput & display Table from selectInput"),
+  selectInput("dataset",
+              label = "Scegli tipo di percorso",
+              choices = c("Auto", "Trasporto Pubblico", "A Piedi"),
+              selected = "Auto"), 
+  
+  tableOutput("selected_var")
+  
+)
+
+
+Caric<-function(){
+  
+  sequences<-seq(from = 1, to = 7, by = 1)
+  li<-"https://www.immobiliare.it/search-list/?fkRegione=sic&idProvincia=PA&idComune=11131&idMZona%5B0%5D=10073&idContratto=1&idCategoria=1&idTipologia%5B0%5D=4&idTipologia%5B1%5D=5&idTipologia%5B2%5D=7&stato=6&tipoProprieta=1&__lang=it&pag="
+  
+  cod_centro<-codes(li,sequences)  
+  
+  Dataset_centro<-datas(cod_centro)
+  
+  sequences<-seq(from = 1, to = 2, by = 1)
+  
+  cod_att<-codes(li,sequences,k=2)  
+  
+  Dataset_att<-datas(cod_att)
+  
+  Dataset_att_p<-pulis(Dataset_att)
+  Dataset_centro_p<-pulis(Dataset_centro)
+  
+  cod<-list(cod_centro,cod_att)
+  names(cod)<-c("Centro","Attico")
+  data<-list(Dataset_centro_p,Dataset_att_p)
+  names(data)<-c("Centro","Attico")
+  total<-list(cod,data)
+  names(total)<-c("Codici","Dataset")
+  return(total)
+}
+
+
+  
+rD <- rsDriver(browser="firefox", port=4545L, verbose=F)
+remDr <- rD[["client"]]
+dati<-Caric()
+
+## Coodinate
+
+Cord_cent<-corder(dati$Dataset$Centro)
+Cord_Att<-corder(dati$Dataset$Attico)
+
+prova<-na.omit(Cord_Att)
+A<-"38.149696365467754 13.317492239559737"
+
+"1=Auto"
+"2=Trasporto Pubblico"
+"3=A Piedi"
+"4=Bicicletta"
+"5=Voli"
+
+Distanze<-servcond(A,prova,1:3)
+
+shinyApp(ui = ui, server = server)
+
+
+###  Analisi ...
+
+
+
+Dataset_centro$via
+ggplot(Dataset_centro[-nrow(Dataset_centro),],aes(x=Locali,y=Prezzo))+
+  geom_point()+
+  theme_minimal()
+
+
+## ID
+
+Dataset_centro<- dati$Dataset$Centro %>% mutate(ID=dati$Codici$Centro)
+
+Datas_com<-Dataset_centro %>% filter(ID %in% dati$Codici$Centro[dati$Codici$Centro %in% dati$Codici$Attico])
+
+Feature<-extractor(Datas_com$ID)
+
+Feature$`91270396`
