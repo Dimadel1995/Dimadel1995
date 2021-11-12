@@ -408,3 +408,16 @@ Datas_com<-Dataset_centro %>% filter(ID %in% dati$Codici$Centro[dati$Codici$Cent
 Feature<-extractor(Datas_com$ID)
 
 Feature$`91270396`
+
+
+## APP
+
+library(rsconnect)
+setwd("C:/Users/..../prova")
+# create 2 file(server.R and ui.R and another file for run app in directory)
+runApp() # if run then create app using follow code
+deployApp()
+
+
+
+
